@@ -8,6 +8,13 @@ contract Escrow {
     address payable public seller;
     address payable public buyer;
     address payable public escrowOwner;
+    
+    address[] public clients;
+    
+    // mapping(address => uint256) private clients;
+    // address[] private clientIndex;
+    
+
     uint public feePercent;
     uint256 public escrowCharge;
 
@@ -17,7 +24,7 @@ contract Escrow {
     bool public sellerCancel;
     bool public buyerCancel;
     
-    uint256[] public deposits;
+    mapping(address => uint256) public deposits;
     uint256 public feeAmount;
     uint256 public sellerAmount;
 
@@ -34,6 +41,8 @@ contract Escrow {
             revert();
         }
     }
+    
+   
 
     modifier onlyEscrowOwner() {
         if (msg.sender == escrowOwner) {
@@ -72,13 +81,35 @@ contract Escrow {
         balances[seller] = 0;
         balances[buyer] = 0;
     }
+    
+    function addClient(address _client) public onlyBuyer {
+        clients.push(_client);
+    }
+    
+    function getClientByID(uint256 queryID) public view returns (address) {
+        return clients[queryID];
+    }
 
-    function depositToEscrow() public payable onlyBuyer { //removed second modifier checkBlockNumber
+    function depositToEscrow(address _client) public payable onlyBuyer { //removed second modifier checkBlockNumber
+        
         balances[buyer] = SafeMath.add(balances[buyer], msg.value);
-        deposits.push(msg.value);
+        deposits[_client] = msg.value;
+        clients.push(_client);
         escrowCharge += msg.value;
         eState = EscrowState.buyerDeposited;
         emit Deposit(msg.sender, msg.value); // solhint-disable-line
+        
+    }
+    
+    function adjustDepositToEscrow(address _client, uint _amount) public payable onlyEscrowOwner { //removed second modifier checkBlockNumber
+            balances[buyer] = SafeMath.add(balances[buyer], msg.value);
+            deposits[_client] = deposits[_client] + msg.value;
+            escrowCharge += msg.value;
+            eState = EscrowState.buyerDeposited;
+            buyer.transfer(_amount);
+            emit Deposit(buyer, msg.value); // solhint-disable-line
+
+        
     }
 
     function approveEscrow() public {
@@ -119,9 +150,9 @@ contract Escrow {
         return address(this);
     }
     
-    function getAllDeposits() public view returns (uint256[] memory) {
-        return deposits;
-    }
+    // function getAllDeposits() public view returns (uint256[] memory) {
+    //     return deposits;
+    // }
     
     function hasBuyerApproved() public view returns (bool) {
         if (buyerApproval) {
